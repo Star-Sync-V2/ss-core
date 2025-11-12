@@ -762,3 +762,34 @@ class RequestService:
             if result is not None:
                 contacts.append(result)
         return contacts
+    
+    #New Code added by MD
+    def list_pending_requests(self, mission_id=None):
+        # TODO: return a list of Request objects with .id, .satellite, .window_start, .window_end
+        return self._list_pending_from_db(mission_id)
+
+    def list_existing_contacts(self):
+        # TODO: return objects with .station_id, .aos, .los (scheduled contacts)
+        return self._list_contacts_from_db()
+
+    def get_request(self, request_id: int):
+        # TODO: fetch by id
+        return self._get_request_from_db(request_id)
+
+    def create_contact_from_candidate(self, req, candidate):
+        # TODO: persist and return a contact-like object with mission_name, satellite_name, station_name, aos/rf_on/rf_off/los
+        return self._create_contact_in_db(req, candidate)
+
+    def compose_contact_like(self, req, candidate):
+        """Return a lightweight object with the fields used by _as_report, without saving."""
+        class C:
+            pass
+        c = C()
+        c.mission_name = getattr(req, "mission_name", "Mission")
+        c.satellite_name = getattr(req.satellite, "name", "SAT")
+        c.station_name = str(candidate.get("station_id"))
+        c.aos = candidate["aos"]
+        c.rf_on = candidate["rf_on"]
+        c.rf_off = candidate["rf_off"]
+        c.los = candidate["los"]
+        return c

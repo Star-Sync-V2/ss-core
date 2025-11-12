@@ -12,7 +12,10 @@ from .routers import (
     satellite,
     exclusion_cone,
     user,
+    schedule,   # Added by MD
+    metrics,    # Added by MD
 )
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,6 +42,10 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(satellite.router, prefix="/api/v1")
 app.include_router(exclusion_cone.router, prefix="/api/v1")
 app.include_router(user.router, prefix="/api/v1")
+
+# Added by MD
+app.include_router(schedule.router, prefix="/api/v1") 
+app.include_router(metrics.router, prefix="/api/v1")  
 
 
 @app.get("/", include_in_schema=False)

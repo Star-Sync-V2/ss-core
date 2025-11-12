@@ -7,6 +7,9 @@ from app.models.ground_station import (
     GroundStationUpdateModel,
 )
 from app.entities.GroundStation import GroundStation
+from app.entities.Visibility import Visibility  # <-- ABSOLUTE import
+from datetime import datetime, timedelta
+
 
 
 class GroundStationService:
@@ -156,3 +159,7 @@ class GroundStationService:
                 status_code=500,
                 detail=f"Unexpected error while deleting ground station {gs_id}: {str(e)}",
             )
+    #Added by MD
+    def get_visibilities(self, satellite, gs, start: datetime, end: datetime) -> list[Visibility]:
+        # TODO: call your real pass computation if available
+        return [Visibility(gs=gs, sat=satellite, start=start, end=end)]
