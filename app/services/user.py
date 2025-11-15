@@ -6,6 +6,13 @@ from app.entities.User import User
 from app.services.auth import get_password_hash
 
 
+def is_system_admin(role: str) -> bool:
+    """
+    Helper to treat legacy 'admin' and new 'system_admin' as full system admins.
+    """
+    return role in ("admin", "system_admin")
+
+
 class UserService:
     @staticmethod
     def update_user(
@@ -14,7 +21,7 @@ class UserService:
         try:
             existing_user = UserService.get_user(
                 db, user_id, current_user
-            )  # already checks for admin rights, no need to check again
+            )  # already checks permissions
 
             update_data = request.model_dump(exclude_unset=True)
             for key, value in update_data.items():
@@ -37,13 +44,14 @@ class UserService:
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Unexpected error while updating satellite {user_id}: {str(e)}",
+                detail=f"Unexpected error while updating user {user_id}: {str(e)}",
             )
 
     @staticmethod
     def get_users(db: Session, current_user: UserModel) -> list[User]:
         try:
-            if current_user.role != "admin":
+            # 🔹 Only system admins can list all users
+            if not is_system_admin(current_user.role):
                 raise HTTPException(status_code=403, detail="Permission denied")
 
             statement = select(User)
@@ -67,7 +75,9 @@ class UserService:
     @staticmethod
     def get_user(db: Session, user_id: int, current_user: UserModel) -> User:
         try:
-            if current_user.role != "admin" and current_user.id != user_id:
+            # 🔹 System admin can see any user
+            # 🔹 Non-admin can only see themselves
+            if not is_system_admin(current_user.role) and current_user.id != user_id:
                 raise HTTPException(status_code=403, detail="Permission denied")
 
             statement = select(User).where(User.id == user_id)

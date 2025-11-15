@@ -136,3 +136,37 @@ def register_user(db: Session, user_data: UserCreate) -> User:
     db.refresh(new_user)
 
     return new_user
+
+def register_user(db: Session, user_data: UserCreate) -> User:
+    """Register a new user after validating username and email are unique"""
+    # Check if username already exists
+    existing_user = get_user_by_username(db, user_data.username)
+    if existing_user:
+        raise ValueError("Username already registered")
+
+    # Check if email already exists
+    existing_email = get_user_by_email(db, user_data.email)
+    if existing_email:
+        raise ValueError("Email already registered")
+
+    # Create new user
+    hashed_password = get_password_hash(user_data.password)
+
+    # 🔹 Use role + mission_id from user_data (with safe defaults)
+    role = getattr(user_data, "role", "user") or "user"
+    mission_id = getattr(user_data, "mission_id", None)
+
+    new_user = User(
+        username=user_data.username,
+        email=user_data.email,
+        hashed_password=hashed_password,
+        role=role,
+        mission_id=mission_id,
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
+

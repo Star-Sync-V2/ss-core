@@ -3,6 +3,17 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator
 
 
+# Allowed roles (include old ones so existing data still works)
+ALLOWED_ROLES = {
+    "admin",          # legacy
+    "user",           # legacy
+    "system_admin",
+    "system_user",
+    "mission_admin",
+    "mission_user",
+}
+
+
 class UserBaseModel(BaseModel):
     username: str = Field(description="Username", examples=["johndoe"])
     email: str = Field(description="User email", examples=["johndoe@email.com"])
@@ -10,9 +21,21 @@ class UserBaseModel(BaseModel):
     first_name: Optional[str] = Field(
         description="User's first name", examples=["John"]
     )
-    last_name: Optional[str] = Field(description="User's last name", examples=["Doe"])
+    last_name: Optional[str] = Field(
+        description="User's last name", examples=["Doe"]
+    )
     role: str = Field(
-        description="User's role (admin or user)", examples=["admin", "user"]
+        description=(
+            "User's role "
+            "(admin/user legacy, or system_admin/system_user/mission_admin/mission_user)"
+        ),
+        examples=["system_admin"],
+    )
+    # 🔹 NEW: mission scoping; used for mission_* roles
+    mission_id: Optional[int] = Field(
+        default=None,
+        description="Mission this user is associated with (for mission_* roles)",
+        examples=[1],
     )
 
 
@@ -55,14 +78,28 @@ class UserUpdateModel(BaseModel):
     )
     role: Optional[str] = Field(
         default=None,
-        description="User's role (admin or user)",
-        examples=["admin", "user"],
+        description=(
+            "User's role "
+            "(admin/user legacy, or system_admin/system_user/mission_admin/mission_user)"
+        ),
+        examples=["system_user"],
+    )
+    # 🔹 NEW: allow updating mission
+    mission_id: Optional[int] = Field(
+        default=None,
+        description="Mission this user is associated with (for mission_* roles)",
+        examples=[1],
     )
 
     @field_validator("role")
     def validate_role(cls, value):
-        if value not in {"admin", "user"}:
-            raise ValueError("Role must be either 'admin' or 'user'")
+        if value is None:
+            return value
+        if value not in ALLOWED_ROLES:
+            raise ValueError(
+                "Role must be one of: "
+                + ", ".join(sorted(ALLOWED_ROLES))
+            )
         return value
 
     class Config:
