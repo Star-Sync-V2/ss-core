@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse  # type: ignore
 from pygelf import GelfTcpHandler
+
 from .routers import (
     gs,
     hello,
@@ -15,6 +16,7 @@ from .routers import (
     schedule,   # Added by MD
     metrics,    # Added by MD
 )
+from app.routers.mission import router as mission_router
 
 import logging
 
@@ -42,6 +44,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(satellite.router, prefix="/api/v1")
 app.include_router(exclusion_cone.router, prefix="/api/v1")
 app.include_router(user.router, prefix="/api/v1")
+app.include_router(mission_router, prefix="/api/v1")  # 👈 ADD THIS
 
 # Added by MD
 app.include_router(schedule.router, prefix="/api/v1") 

@@ -6,7 +6,9 @@ import os
 
 load_dotenv()
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://root:password@ss-db:5432/ss_database"
+    "DATABASE_URL", 
+    #"postgresql://root:password@localhost:5432/ss_database" #used for testing
+    "postgresql://root:password@ss-db:5432/ss_database"
 )
 
 engine = create_engine(DATABASE_URL)

@@ -27,7 +27,13 @@ class SatelliteCreateModel(BaseModel):
         ge=0, description="Science data rate in Mbps", examples=[100.0]
     )
     priority: int = Field(ge=0, description="Priority of the satellite", examples=[1])
-
+    
+     # 🔹 NEW
+    mission_id: Optional[int] = Field(
+        default=None,
+        description="Mission this satellite belongs to",
+        examples=[1],
+    )
 
 class SatelliteModel(SatelliteCreateModel):
     """
@@ -45,7 +51,7 @@ class SatelliteModel(SatelliteCreateModel):
     )
 
     class Config:
-        from_attributes = True  # Allow conversion from SQLModel objects
+        from_attributes = True  # Allow conversion from SQLModel object
 
 
 class SatelliteUpdateModel(BaseModel):
@@ -76,4 +82,10 @@ class SatelliteUpdateModel(BaseModel):
     )
     priority: Optional[int] = Field(
         ge=0, default=None, description="Priority of the satellite", examples=[1]
+    )
+    # 🔹 NEW
+    mission_id: Optional[int] = Field(
+        default=None,
+        description="Mission this satellite belongs to",
+        examples=[1],
     )

@@ -4,6 +4,7 @@ from sqlmodel import Relationship, SQLModel, Field  # type: ignore
 from sqlalchemy.orm import Mapped
 from typing import List
 from app.entities.ExclusionCone import ExclusionCone
+from typing import List, Optional
 
 
 class Satellite(SQLModel, table=True):
@@ -17,7 +18,12 @@ class Satellite(SQLModel, table=True):
     science: float
     priority: int
     ex_cones: Mapped[List["ExclusionCone"]] = Relationship(back_populates="satellite")
-
+    
+    mission_id: Optional[int] = Field(
+        default=None,
+        nullable=True,
+        description="Mission this satellite belongs to",
+    )
     # this init will most likely be removed soon
     def __init__(
         self,
@@ -28,6 +34,7 @@ class Satellite(SQLModel, table=True):
         telemetry: float = 0,
         science: float = 0,
         priority: int = 0,
+        mission_id: Optional[int] = None,  
         # ex_cone: Optional[List[ExclusionCone]] = None,
     ):
         self.id = id if id is not None else uuid.uuid4()
@@ -38,6 +45,7 @@ class Satellite(SQLModel, table=True):
         self.science = science
         # self.ex_cone = ex_cone
         self.priority = priority
+        self.mission_id = mission_id       # 👈 new
 
     def get_sf_sat(self) -> EarthSatellite:
         tle_lines = self.tle.splitlines()
