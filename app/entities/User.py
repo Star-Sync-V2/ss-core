@@ -16,13 +16,13 @@ class User(SQLModel, table=True):
     first_name: Optional[str] = Field(nullable=False, default="")
     last_name: Optional[str] = Field(nullable=False, default="")
 
-    # keep default "user" so existing rows still make sense
+    # keep default "system_user" so existing rows still make sense
     role: str = Field(
         nullable=False,
-        default="user",
+        default="system_user",
         description=(
             "Role of the user "
-            "(admin/user legacy, or system_admin/system_user/mission_admin/mission_user)"
+            "(system_admin/system_user/mission_admin/mission_user)"
         ),
     )
 
@@ -42,8 +42,8 @@ class UserCreate(SQLModel):
     password: str
 
     # Optional; default stays 'user' for backwards compatibility
-    role: str = "user"
-    mission_id: Optional[int] = None
+    role: str = "system_user" # Changed to system_user was user
+    mission_id: Optional[int] = None 
 
 
 class UserRead(SQLModel):

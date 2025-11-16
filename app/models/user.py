@@ -5,8 +5,6 @@ from pydantic import BaseModel, Field, field_validator
 
 # Allowed roles (include old ones so existing data still works)
 ALLOWED_ROLES = {
-    "admin",          # legacy
-    "user",           # legacy
     "system_admin",
     "system_user",
     "mission_admin",
@@ -27,7 +25,7 @@ class UserBaseModel(BaseModel):
     role: str = Field(
         description=(
             "User's role "
-            "(admin/user legacy, or system_admin/system_user/mission_admin/mission_user)"
+            "(system_admin/system_user/mission_admin/mission_user)"
         ),
         examples=["system_admin"],
     )
@@ -80,11 +78,11 @@ class UserUpdateModel(BaseModel):
         default=None,
         description=(
             "User's role "
-            "(admin/user legacy, or system_admin/system_user/mission_admin/mission_user)"
+            "(system_admin/system_user/mission_admin/mission_user)"
         ),
         examples=["system_user"],
     )
-    # 🔹 NEW: allow updating mission
+    # NEW: allow updating mission
     mission_id: Optional[int] = Field(
         default=None,
         description="Mission this user is associated with (for mission_* roles)",

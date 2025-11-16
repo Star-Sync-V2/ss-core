@@ -160,8 +160,10 @@ def register_user(db: Session, user_data: UserCreate) -> User:
         username=user_data.username,
         email=user_data.email,
         hashed_password=hashed_password,
-        role=role,
-        mission_id=mission_id,
+        role=user_data.role,            # NEW
+        mission_id=user_data.mission_id # NEW
+        #role=role,
+        #mission_id=mission_id,
     )
 
     db.add(new_user)
