@@ -5,6 +5,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from ..entities.GroundStation import GroundStation
 from pydantic import ConfigDict
 
+
 if TYPE_CHECKING:
     from app.entities.Satellite import Satellite
 
@@ -32,6 +33,11 @@ class RFRequest(SQLModel, table=True):  # type: ignore
     )
     time_remaining: int = 0  # Will be set in __init__
     num_passes_remaining: int = Field(default=min_passes)
+    mission_id: Optional[int] = Field(
+        default=None,
+        nullable=True,
+        description="Mission this RF request belongs to",
+    )
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -95,7 +101,12 @@ class ContactRequest(SQLModel, table=True):  # type: ignore
     rf_on: datetime
     rf_off: datetime
     duration: int
-
+    mission_id: Optional[int] = Field(
+        default=None,
+        nullable=True,
+        description="Mission this contact request belongs to",
+    )
+    
     def __repr__(self):
         duration_str = "N/A"
         if self.aos and self.los:

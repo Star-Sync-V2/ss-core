@@ -41,6 +41,11 @@ class RFTimeRequestModel(BaseModel):
         description="The minimum number of passes that should be provided to the mission in support of this request",
         examples=[2],
     )
+    mission_id: Optional[int] = Field(
+        default=None,
+        description="Mission this request belongs to"
+    )
+
 
 
 class ContactRequestModel(BaseModel):
@@ -83,13 +88,16 @@ class ContactRequestModel(BaseModel):
         description="Time of the Loss of Signal for the contact",
         examples=[datetime.now() + timedelta(minutes=50)],
     )
+    mission_id: Optional[int] = Field(
+        default=None,
+        description="Mission this request belongs to"
+    )
 
 
 class GeneralContactResponseModel(BaseModel):
     """
     This is a general response model for both RF time and contact requests.
     """
-
     id: UUID = Field(
         description="The ID of the request",
         examples=["228f21de-116c-493a-9982-8ee24d9f57bf"],
@@ -143,6 +151,12 @@ class GeneralContactResponseModel(BaseModel):
     los: Optional[datetime] = Field(
         description="Time of the Loss of Signal for the contact",
         examples=["2024-10-15T12:20:00"],
+    )
+   # 🔹 ADD THIS
+    mission_id: Optional[int] = Field(
+        default=None,
+        description="Mission this request belongs to",
+        examples=[1],
     )
 
     class Config:
