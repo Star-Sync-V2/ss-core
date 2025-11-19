@@ -15,6 +15,14 @@ from app.entities.Request import (
 from app.services.request import RequestService, Booking
 import logging
 from app.routers.error import getErrorResponses
+from app.models.user import UserModel
+from app.services.auth import get_current_user
+from app.services.permissions import (
+    SYSTEM_ADMIN,
+    SYSTEM_USER,
+    MISSION_ADMIN,
+    MISSION_USER,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +41,11 @@ router = APIRouter(
 )
 def get_requests(
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
 ):
     try:
-        return RequestService.get_all_transformed_requests(db)
+        return RequestService.get_all_transformed_requests(db, current_user)
+
     except Exception as e:
         logger.error(f"Error getting all requests: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -83,10 +93,15 @@ def sample(
     response_description="Request body",
     responses={**getErrorResponses(400), **getErrorResponses(503), **getErrorResponses(500)},  # type: ignore[dict-item]
 )
-def rf_time(request: RFTimeRequestModel, db: Session = Depends(get_db)):
+def rf_time(
+    request: RFTimeRequestModel,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
     try:
-        created_request = RequestService.create_rf_request(db, request)
+        created_request = RequestService.create_rf_request(db, request, current_user)
         return created_request
+
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -163,7 +178,7 @@ def get_contact_request(request_id: UUID, db: Session = Depends(get_db)):
 
 @router.delete(
     "/contact/{request_id}",
-    summary="Delete Contact Request by ID",
+    summary="Delete Contact Request by ID", 
     responses={**getErrorResponses(404), **getErrorResponses(503), **getErrorResponses(500)},  # type: ignore[dict-item]
 )
 def delete_contact_request(request_id: UUID, db: Session = Depends(get_db)):

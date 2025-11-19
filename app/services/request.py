@@ -19,7 +19,14 @@ import logging
 from uuid import UUID
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
-
+from app.models.user import UserModel
+from app.services.permissions import is_system_role, is_mission_role
+from app.services.permissions import (
+    SYSTEM_ADMIN,
+    SYSTEM_USER,
+    MISSION_ADMIN,
+    MISSION_USER,
+)
 logger = logging.getLogger(__name__)
 
 random.seed(42)
@@ -87,12 +94,14 @@ def schedule_with_slots(
         defaultdict(dict)
     )
     bookings: list[Booking] = []
+    
     # sort the requests by earliest end time
     requests.sort(key=lambda r: r.end_time)
+    
     # set all requests to not scheduled
     for request in requests:
         request.scheduled = False
-
+        
     # Schedule ContactRequests first
     for request in requests:
         if isinstance(request, ContactRequest):
@@ -122,6 +131,7 @@ def schedule_with_slots(
 
                 slots[station_id][(start, start + slot_duration)] = booking
                 bookings.append(booking)
+                
                 # converting from float to int could cause issues in the future
                 remaining_time -= int(slot_duration.total_seconds())
                 request.scheduled = True
@@ -288,7 +298,6 @@ def is_visible(
 
 
 class RequestService:
-
     # crud requests
     @staticmethod
     def get_rf_time_request(db: Session, request_id: UUID) -> RFRequest | None:
@@ -345,7 +354,11 @@ class RequestService:
             )
 
     @staticmethod
-    def create_rf_request(db: Session, request: RFTimeRequestModel) -> RFRequest:
+    def create_rf_request(
+        db: Session,
+        request: RFTimeRequestModel,
+        current_user: UserModel,
+    ) -> RFRequest:
         try:
             # Validate request data
             if not request.missionName:
@@ -375,7 +388,42 @@ class RequestService:
                     detail="Minimum number of passes must be at least 1",
                 )
 
-            # Map the request model fields to entity fields
+            # -------- RBAC + mission_id handling --------
+            mission_id_to_use: int | None = None
+
+            # Only system_admin + mission_admin can create
+            if current_user.role == SYSTEM_ADMIN:
+                # can set any mission_id (including None)
+                mission_id_to_use = request.mission_id
+
+            elif current_user.role == MISSION_ADMIN:
+                # mission_admin → locked to their mission_id
+                if current_user.mission_id is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Current user has no mission_id assigned",
+                    )
+
+                if (
+                    request.mission_id is not None
+                    and request.mission_id != current_user.mission_id
+                ):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Mission admins can only create RF requests for their own mission",
+                    )
+
+                mission_id_to_use = current_user.mission_id
+
+            else:
+                # system_user + mission_user (and anything else) → no write access
+                raise HTTPException(
+                    status_code=403,
+                    detail="Write access denied for RF requests",
+                )
+
+
+            # -------- build entity --------
             rf_request = RFRequest(
                 mission=request.missionName,
                 satellite_id=request.satelliteId,
@@ -391,7 +439,9 @@ class RequestService:
                 scheduled=False,
                 time_remaining=0,  # Will be calculated in __init__
                 num_passes_remaining=request.minimumNumberOfPasses or 1,
+                mission_id=mission_id_to_use,
             )
+
             # ensure utc timezone
             rf_request.start_time = rf_request.start_time.replace(
                 tzinfo=datetime.timezone.utc
@@ -399,10 +449,12 @@ class RequestService:
             rf_request.end_time = rf_request.end_time.replace(
                 tzinfo=datetime.timezone.utc
             )
+
             db.add(rf_request)
             db.commit()
             db.refresh(rf_request)
             return rf_request
+
         except HTTPException:
             raise
         except SQLAlchemyError as e:
@@ -560,37 +612,70 @@ class RequestService:
                 status_code=500,
                 detail=f"Error deleting contact request: {str(e)}",
             )
-
+            
     @staticmethod
-    def get_all_transformed_requests(db: Session) -> list[GeneralContactResponseModel]:
+    def get_all_transformed_requests(
+        db: Session,
+        current_user: UserModel,
+    ) -> list[GeneralContactResponseModel]:
         try:
-            rf_requests: list[RFRequest] = list(db.exec(select(RFRequest)).all())
-            c_requests: list[ContactRequest] = list(
-                db.exec(select(ContactRequest)).all()
-            )
+            # Re-use RBAC logic from get_all_requests
+            all_requests = RequestService.get_all_requests(db, current_user)
+
             contacts: list[GeneralContactResponseModel] = []
-            all_requests: list[Request] = [*rf_requests, *c_requests]
             for request in all_requests:
-                result = RequestService.transform_request_to_general(db, request)
+                result = RequestService.transform_request_to_general(
+                    db, request, current_user
+                )
                 if result is not None:
                     contacts.append(result)
             return contacts
+
         except SQLAlchemyError as e:
             db.rollback()
             logger.error(f"Error getting all transformed requests: {str(e)}")
-            raise
+            raise HTTPException(
+                status_code=503,
+                detail=f"Database error while getting all transformed requests: {str(e)}",
+            )
         except Exception as e:
             logger.error(f"Error getting all transformed requests: {str(e)}")
-            raise
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error getting all transformed requests: {str(e)}",
+            )
+
+
+
+
 
     @staticmethod
-    def get_all_requests(db: Session) -> list[Request]:
+    def get_all_requests(
+        db: Session,
+        current_user: UserModel,
+    ) -> list[Request]:
         try:
-            rf_requests: list[RFRequest] = list(db.exec(select(RFRequest)).all())
-            c_requests: list[ContactRequest] = list(
-                db.exec(select(ContactRequest)).all()
-            )
+            rf_stmt = select(RFRequest)
+            c_stmt = select(ContactRequest)
+
+            if is_system_role(current_user):
+                # system_admin / system_user → see everything
+                pass
+            elif is_mission_role(current_user):
+                # mission_admin / mission_user → only their mission
+                if current_user.mission_id is None:
+                    # safest: return empty; or raise 400
+                    return []
+                rf_stmt = rf_stmt.where(RFRequest.mission_id == current_user.mission_id)
+                c_stmt = c_stmt.where(ContactRequest.mission_id == current_user.mission_id)
+            else:
+                # other roles → no visibility
+                return []
+
+            rf_requests: list[RFRequest] = list(db.exec(rf_stmt).all())
+            c_requests: list[ContactRequest] = list(db.exec(c_stmt).all())
             return [*rf_requests, *c_requests]
+
         except SQLAlchemyError as e:
             db.rollback()
             logger.error(f"Error getting all requests: {str(e)}")
@@ -605,10 +690,12 @@ class RequestService:
                 detail=f"Error getting all requests: {str(e)}",
             )
 
+
     @staticmethod
     def transform_request_to_general(
         db: Session,
         request: Request,
+        current_user: UserModel,
     ) -> GeneralContactResponseModel | None:
         if request.ground_station_id is None:
             gs = None
@@ -623,7 +710,7 @@ class RequestService:
                     detail=f"Ground Station with ID {request.ground_station_id} not found",
                 )
 
-        sat = SatelliteService.get_satellite(db, request.satellite_id)
+        sat = SatelliteService.get_satellite(db, request.satellite_id, current_user)
         if sat is None:
             logger.error(f"Satellite with ID {request.satellite_id} not found")
             raise HTTPException(
@@ -650,6 +737,7 @@ class RequestService:
             rf_off=request.rf_off if isinstance(request, ContactRequest) else None,
             los=request.los if isinstance(request, ContactRequest) else None,
             orbit=request.orbit if isinstance(request, ContactRequest) else None,
+            mission_id=getattr(request, "mission_id", None),
         )
 
     @staticmethod

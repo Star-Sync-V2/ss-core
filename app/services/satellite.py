@@ -1,5 +1,6 @@
 import uuid
-from fastapi import HTTPException
+
+from fastapi import Depends, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select, Session
 from sqlalchemy.orm import joinedload
@@ -9,6 +10,8 @@ from app.models.satellite import (
 )
 from app.entities.Satellite import Satellite
 from app.models.user import UserModel
+from app.services.auth import get_current_user
+
 
 
 class SatelliteService:
@@ -103,7 +106,7 @@ class SatelliteService:
                 )
 
             update_data = satellite.model_dump(exclude_unset=True)
-
+            
             # mission_admin cannot move satellites to other missions
             if current_user.role == "mission_admin":
                 if "mission_id" in update_data and update_data["mission_id"] != current_user.mission_id:
