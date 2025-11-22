@@ -1,20 +1,24 @@
 import uuid
 from fastapi import APIRouter, Depends
 from typing import List
+from sqlmodel import Session
+
 from app.models.exclusion_cone import (
     ExclusionConeModel,
     ExclusionConeCreateModel,
     ExclusionConeUpdateModel,
 )
-from sqlmodel import Session
-from app.routers.error import getErrorResponses
 from app.services.db import get_db
 from app.services.exclusion_cone import ExclusionConeService
+from app.services.auth import get_current_user
+from app.models.user import UserModel
+from app.routers.error import getErrorResponses
+from app.models.user import UserModel
+from app.services.auth import get_current_user
 
 router = APIRouter(prefix="/excones", tags=["Exclusion Cone"])
 
-
-# POST /api/v1/excones
+# POST create cone
 @router.post(
     "/",
     summary="Create a new ExclusionCone",
@@ -23,12 +27,14 @@ router = APIRouter(prefix="/excones", tags=["Exclusion Cone"])
     responses={**getErrorResponses(503), **getErrorResponses(500)},  # type: ignore[dict-item]
 )
 def create_exclusion_cone(
-    request: ExclusionConeCreateModel, db: Session = Depends(get_db)
+    request: ExclusionConeCreateModel,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
 ):
-    return ExclusionConeService.create_exclusion_cone(db, request)
+    return ExclusionConeService.create_exclusion_cone(db, request, current_user)
 
 
-# PATCH /api/v1/excones/{excone_id}
+# PATCH update
 @router.patch(
     "/{excone_id}",
     summary="Update exclusion cone",
@@ -40,11 +46,12 @@ def update_exclusion_cone(
     excone_id: uuid.UUID,
     request: ExclusionConeUpdateModel,
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
 ):
-    return ExclusionConeService.update_exclusion_cone(db, excone_id, request)
+    return ExclusionConeService.update_exclusion_cone(db, excone_id, request, current_user)
 
 
-# GET /api/v1/excones
+# GET list cones
 @router.get(
     "/",
     summary="Get a list of all exclusion_cones",
@@ -52,11 +59,13 @@ def update_exclusion_cone(
     response_description="List of exclusion cone objects",
     responses={**getErrorResponses(503), **getErrorResponses(500)},  # type: ignore[dict-item]
 )
-def get_exclusion_cones(db: Session = Depends(get_db)):
-    return ExclusionConeService.get_exclusion_cones(db)
+def get_exclusion_cones(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return ExclusionConeService.get_exclusion_cones(db, current_user)
 
 
-# GET /api/v1/excones/{excone_id}
 @router.get(
     "/{excone_id}",
     summary="Get a exclusion_cone by id",
@@ -64,11 +73,14 @@ def get_exclusion_cones(db: Session = Depends(get_db)):
     response_description="Specific exclusion object",
     responses={**getErrorResponses(404), **getErrorResponses(503), **getErrorResponses(500)},  # type: ignore[dict-item]
 )
-def get_exclusion_cone(excone_id: uuid.UUID, db: Session = Depends(get_db)):
-    return ExclusionConeService.get_exclusion_cone(db, excone_id)
+def get_exclusion_cone(
+    excone_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return ExclusionConeService.get_exclusion_cone(db, excone_id, current_user)
 
 
-# DELETE /api/v1/exclusion_cone/{exclusion_cone_id}
 @router.delete(
     "/{excone_id}",
     summary="Delete a exclusion_cone",
@@ -76,5 +88,9 @@ def get_exclusion_cone(excone_id: uuid.UUID, db: Session = Depends(get_db)):
     response_description="Deleted exclusion cone object",
     responses={**getErrorResponses(404), **getErrorResponses(409), **getErrorResponses(503), **getErrorResponses(500)},  # type: ignore[dict-item]
 )
-def delete_exclusion_cone(excone_id: uuid.UUID, db: Session = Depends(get_db)):
-    return ExclusionConeService.delete_exclusion_cone(db, excone_id)
+def delete_exclusion_cone(
+    excone_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    return ExclusionConeService.delete_exclusion_cone(db, excone_id, current_user)

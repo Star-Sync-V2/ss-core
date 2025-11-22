@@ -60,7 +60,7 @@ def list_missions(
     current_user: UserModel = Depends(get_current_user),
 ):
     # For now: all roles can list missions; we can tighten later if needed
-    return MissionService.get_missions(db)
+    return MissionService.get_missions(db, current_user)
 
 
 @router.get(

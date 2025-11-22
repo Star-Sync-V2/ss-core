@@ -23,6 +23,8 @@ from app.services.permissions import (
     MISSION_ADMIN,
     MISSION_USER,
 )
+from app.models.user import UserModel
+from app.services.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +61,11 @@ def get_requests(
 )
 def get_bookings(
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+
 ):
     try:
-        return RequestService.get_bookings(db)
+        return RequestService.get_bookings(db, current_user)
     except Exception as e:
         logger.error(f"Error getting bookings: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -74,10 +78,12 @@ def get_bookings(
     responses={**getErrorResponses(400), **getErrorResponses(503), **getErrorResponses(500)},  # type: ignore[dict-item]
 )
 def sample(
+    request: ContactRequestModel,
     db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
 ):
     try:
-        future_reqs = RequestService.sample(db)
+        future_reqs = RequestService.sample(db, request, current_user)
         return future_reqs
     except HTTPException as e:
         raise e
@@ -116,9 +122,9 @@ def rf_time(
     response_description="Simple success string for now",
     responses={**getErrorResponses(400), **getErrorResponses(503), **getErrorResponses(500)},  # type: ignore[dict-item]
 )
-def contact(request: ContactRequestModel, db: Session = Depends(get_db)):
+def contact(request: ContactRequestModel, db: Session = Depends(get_db), current_user: UserModel = Depends(get_current_user)):
     try:
-        resp = RequestService.create_contact_request(db, request)
+        resp = RequestService.create_contact_request(db, request, current_user)
         return resp
     except HTTPException as e:
         raise e

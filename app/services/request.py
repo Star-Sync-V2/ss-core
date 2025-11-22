@@ -27,6 +27,7 @@ from app.services.permissions import (
     MISSION_ADMIN,
     MISSION_USER,
 )
+from app.services.auth import get_current_user
 logger = logging.getLogger(__name__)
 
 random.seed(42)
@@ -473,10 +474,12 @@ class RequestService:
 
     @staticmethod
     def create_contact_request(
-        db: Session, request: ContactRequestModel
+        db: Session,
+        request: ContactRequestModel,
+        current_user: UserModel,
     ) -> ContactRequest:
         try:
-            # Validate request data
+            # ---- validation ----
             if not request.missionName:
                 raise HTTPException(
                     status_code=400,
@@ -493,12 +496,43 @@ class RequestService:
                     detail="RF on time must be before RF off time",
                 )
 
-            # Map the request model fields to entity fields
+            # ---- RBAC + mission_id handling ----
+            mission_id_to_use: int | None = None
+
+            if current_user.role == SYSTEM_ADMIN:
+                mission_id_to_use = request.mission_id  # system_admin can set any
+
+            elif current_user.role == MISSION_ADMIN:
+                if current_user.mission_id is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Current user has no mission_id assigned",
+                    )
+
+                if (
+                    request.mission_id is not None
+                    and request.mission_id != current_user.mission_id
+                ):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Mission admins can only create contact requests for their own mission",
+                    )
+
+                mission_id_to_use = current_user.mission_id
+
+            else:
+                # system_user + mission_user: no write access
+                raise HTTPException(
+                    status_code=403,
+                    detail="Write access denied for contact requests",
+                )
+
+            # ---- build entity ----
             contact_request = ContactRequest(
                 mission=request.missionName,
                 satellite_id=request.satelliteId,
-                start_time=request.aosTime,  # Use AOS time as start time
-                end_time=request.losTime,  # Use LOS time as end time
+                start_time=request.aosTime,
+                end_time=request.losTime,
                 ground_station_id=request.station_id,
                 orbit=request.orbit,
                 uplink=request.uplink,
@@ -510,13 +544,18 @@ class RequestService:
                 rf_off=request.rfOffTime,
                 duration=int((request.losTime - request.aosTime).total_seconds()),
                 priority=1,
-                booking_id=None,  # Will be set when scheduled
+                booking_id=None,
                 scheduled=False,
+                mission_id=mission_id_to_use,
             )
+
             db.add(contact_request)
             db.commit()
             db.refresh(contact_request)
             return contact_request
+
+        except HTTPException:
+            raise
         except SQLAlchemyError as e:
             db.rollback()
             logger.error(f"Error creating contact request: {str(e)}")
@@ -741,15 +780,19 @@ class RequestService:
         )
 
     @staticmethod
-    def get_bookings(db: Session) -> list[Booking]:
-        # get all requests and schedule them
+    def get_bookings(db: Session, current_user: UserModel) -> list[Booking]:
         try:
-            requests = RequestService.get_all_requests(db)
-            bookings = schedule_with_slots(
-                requests,
-                list(GroundStationService.get_ground_stations(db)),
-            )
+            # Get all requests with RBAC filtering
+            requests = RequestService.get_all_requests(db, current_user)
+
+            # Get ground stations once
+            stations = list(GroundStationService.get_ground_stations(db))
+
+            # Pass both to scheduler
+            bookings = schedule_with_slots(requests, stations)
+
             return bookings
+
         except SQLAlchemyError as e:
             db.rollback()
             logger.error(f"Error getting bookings: {str(e)}")
@@ -757,6 +800,7 @@ class RequestService:
                 status_code=503,
                 detail=f"Database error while getting bookings: {str(e)}",
             )
+
         except Exception as e:
             logger.error(f"Error getting bookings: {str(e)}")
             raise HTTPException(
@@ -767,8 +811,9 @@ class RequestService:
     @staticmethod
     def sample(
         db: Session,
+        current_user: UserModel,
     ) -> list[GeneralContactResponseModel]:
-        sats = SatelliteService.get_satellites(db)
+        sats = SatelliteService.get_satellites(db, current_user)
         stations = GroundStationService.get_ground_stations(db)
         if len(sats) < 2 or len(stations) < 2:
             logger.error("Need at least 2 satellites and 2 ground stations to demo")
@@ -846,7 +891,7 @@ class RequestService:
             db.add(request)
         db.commit()
         for request in requests:
-            result = RequestService.transform_request_to_general(db, request)
+            result = RequestService.transform_request_to_general(db, request, current_user)
             if result is not None:
                 contacts.append(result)
         return contacts

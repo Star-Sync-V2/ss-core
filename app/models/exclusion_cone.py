@@ -77,6 +77,8 @@ class ExclusionConeUpdateModel(BaseModel):
         description="The station for which the exclusion cone will apply.",
         examples=[1],
     )
+    mission_id: Optional[int] = None
+
 
     class Config:
         from_attributes = True  # Allow conversion from SQLModel objects

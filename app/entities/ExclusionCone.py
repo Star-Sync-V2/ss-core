@@ -1,35 +1,32 @@
+# app/entities/ExclusionCone.py
 import uuid
+from uuid import UUID
+from typing import TYPE_CHECKING, Optional
+
 from sqlmodel import SQLModel, Field, Relationship  # type: ignore
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.entities.Satellite import Satellite
 
 
 class ExclusionCone(SQLModel, table=True):
-    __tablename__: str = "exclusion_cones"  # type: ignore
+    __tablename__ = "exclusion_cones"  # must match DB table name
 
-    id: uuid.UUID = Field(primary_key=True)
+    id: UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+    # free-text mission name (kept from old schema)
     mission: str
+
+    # 👇 mission_id is an INT FK → mission.id (because Mission.id is int)
+    mission_id: Optional[int] = Field(
+        default=None,
+        foreign_key="mission.id",  # matches Mission.__tablename__ = "mission"
+    )
+
     angle_limit: float
     interfering_satellite: str
-    satellite_id: uuid.UUID = Field(foreign_key="satellites.id")
-    gs_id: int = Field(foreign_key="ground_stations.id")
-    satellite: "Satellite" = Relationship(back_populates="ex_cones")
 
-    # Will most likely be removed soon
-    def __init__(
-        self,
-        id: uuid.UUID | None = None,
-        mission: str = "",
-        angle_limit: float = 0,
-        interfering_satellite: str = "",
-        satellite_id: uuid.UUID = uuid.uuid4(),
-        gs_id: int = 1,
-    ):
-        self.id = id if id is not None else uuid.uuid4()
-        self.mission = mission
-        self.angle_limit = angle_limit
-        self.interfering_satellite = interfering_satellite
-        self.satellite_id = satellite_id
-        self.gs_id = gs_id
+    satellite_id: UUID = Field(foreign_key="satellites.id")
+    gs_id: int = Field(foreign_key="ground_stations.id")
+
+    satellite: "Satellite" = Relationship(back_populates="ex_cones")

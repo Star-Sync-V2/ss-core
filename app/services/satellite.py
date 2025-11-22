@@ -83,7 +83,7 @@ class SatelliteService:
         - others: 403
         """
         try:
-            existing_sat = SatelliteService.get_satellite(db, sat_id)
+            existing_sat = SatelliteService.get_satellite(db, sat_id, current_user)
 
             if not existing_sat:
                 raise HTTPException(
@@ -235,7 +235,7 @@ class SatelliteService:
         - others: 403
         """
         try:
-            satellite = SatelliteService.get_satellite(db, sat_id)
+            satellite = SatelliteService.get_satellite(db, sat_id, current_user)
 
             if not satellite:
                 raise HTTPException(
