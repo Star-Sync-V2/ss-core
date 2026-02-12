@@ -4,7 +4,7 @@ RBAC + mission scoping smoke tests for core services.
 Run with:
     cd ss-core
     source .venv/bin/activate   # if needed
-    python rbac_smoke.py
+    python smoke_test/rbac_smoke.py
 """
 
 import requests
@@ -13,11 +13,12 @@ import json
 BASE_URL = "http://localhost:8000/api/v1"
 
 TOKENS = {
-    "system_admin":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzeXN0ZW1fYWRtaW4iLCJleHAiOjE3NjM3OTIxNzF9.nsCU1gIbkhMAmifCQQLwPWjcGiKpXFYm7ByFBZDqTMU",
-    "system_user":   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzeXN0ZW1fdXNlciIsImV4cCI6MTc2Mzc5MjE5MH0.yT0ezbTq6KYxQZX5Lzn-2JnLVIB-mEvgGX_5i2grsYo",
-    "mission_admin": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtaXNzaW9uX2FkbWluIiwiZXhwIjoxNzYzNzkyMjA1fQ.DOoEoeeRtxCDrRS2ztebZWuek34l5HQfXcUDi-TqVpA",
-    "mission_user":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtaXNzaW9uX3VzZXIiLCJleHAiOjE3NjM3OTIyMjF9._aHn2QeAZMiphQDAo957WO_Xx-mp5Ulgfqt_NR_Ain4",
+    "system_admin":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzeXN0ZW1fYWRtaW4iLCJleHAiOjE3NzA5MzY0MTN9.C8-Jmx6uyxNmV5vdkw0CefrnM_-Vr6gbDP7gidZUBs0",
+    "system_user":   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzeXN0ZW1fdXNlciIsImV4cCI6MTc3MDkzNjM5OH0.h0OOO5BYHCDwI3_tEW3sNHIPECqoIKfp5mco-C5m-Ac",
+    "mission_admin": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtaXNzaW9uX2FkbWluIiwiZXhwIjoxNzcwOTM2MzgyfQ.8LeMKaTUcKUeUc4uEljrNx0YD6HeX1c69dZnZJueuSM",
+    "mission_user":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtaXNzaW9uX3VzZXIiLCJleHAiOjE3NzA5MzYzNjN9.nzCPKmF4ubv7za05NkWj95bJJzwnV1GL_n6ODML0FqY",
 }
+
 
 ROLES = list(TOKENS.keys())
 
@@ -25,7 +26,42 @@ ROLES = list(TOKENS.keys())
 # ---------------------------
 # Helpers
 # ---------------------------
+from datetime import datetime, timezone
 
+MIN_GAP_SECONDS = 300  # 5 min
+
+def parse_iso_z(s: str) -> datetime:
+    # supports "2025-12-02T01:00:00Z"
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    return datetime.fromisoformat(s)
+
+def assert_no_overlaps(schedule: list, *,
+                       start_key="start_time",
+                       end_key="end_time",
+                       station_key="ground_station_id",
+                       sat_key="satellite_id"):
+    # group by station and by satellite
+    def check_group(key):
+        buckets = {}
+        for c in schedule:
+            buckets.setdefault(c.get(key), []).append(c)
+
+        for k, items in buckets.items():
+            items = sorted(items, key=lambda x: parse_iso_z(x[start_key]))
+            for a, b in zip(items, items[1:]):
+                a_end = parse_iso_z(a[end_key])
+                b_start = parse_iso_z(b[start_key])
+                if (a_end.timestamp() + MIN_GAP_SECONDS) > b_start.timestamp():
+                    raise AssertionError(
+                        f"Guard-band overlap on {key}={k}: "
+                        f"{a[start_key]}–{a[end_key]} then {b[start_key]}–{b[end_key]}"
+                    )
+
+    check_group(station_key)
+    check_group(sat_key)
+    
+    
 def headers_for(role: str) -> dict:
     return {
         "Authorization": f"Bearer {TOKENS[role]}",
@@ -225,6 +261,77 @@ def test_ground_stations_basic_visibility():
         else:
             pretty_result(role, "GET", "/gs/", resp, expected={200, 401, 403})
             
+            
+def test_scheduler_basic(sat_id: str, mission_id: int):
+    print("\n=== SCHEDULER BASIC  ===")
+
+    rf1 = {
+        "missionName": "SCISAT",
+        "mission_id": mission_id,
+        "satelliteId": sat_id,
+        "startTime": "2025-12-02T01:00:00Z",
+        "endTime": "2025-12-02T04:00:00Z",
+        "uplinkTime": 600,
+        "downlinkTime": 600,
+        "scienceTime": 150,
+        "minimumNumberOfPasses": 1,
+    }
+    rf2 = rf1.copy()
+    rf2["startTime"] = "2025-12-02T02:00:00Z"
+    rf2["endTime"]   = "2025-12-02T05:00:00Z"
+
+    call("POST", "/request/rf-time", "system_admin", rf1)
+    call("POST", "/request/rf-time", "system_admin", rf2)
+
+    resp = call(
+        "POST", "/schedule/compute", "system_admin",
+        {
+            "windowStart": "2025-12-02T00:00:00Z",
+            "windowEnd": "2025-12-02T06:00:00Z",
+            "missionId": mission_id,
+        },
+    )
+    pretty_result("system_admin", "POST", "/schedule/compute", resp, {200})
+    data = resp.json()
+
+    print("  schedule keys:", list(data.keys()))
+
+    schedule = data.get("schedule") or data.get("contacts") or []
+    conflicts = data.get("conflicts") or []
+
+    print("  Scheduled contacts:", len(schedule))
+    print("  Conflicts:", len(conflicts))
+
+    if not schedule:
+        print("  [FAIL] No contacts scheduled at all")
+        return
+
+    # TODO: adjust these keys to your real payload fields
+    try:
+        assert_no_overlaps(
+            schedule,
+            start_key="startTime",     # <- change if needed
+            end_key="endTime",         # <- change if needed
+            station_key="gs_id",       # <- change if needed
+            sat_key="satellite_id",    # <- change if needed
+        )
+        print("  [PASS] No station/satellite guard-band overlaps (5 min).")
+    except Exception as e:
+        print("  [FAIL]", e)
+
+    # Determinism check
+    resp2 = call(
+        "POST", "/schedule/compute", "system_admin",
+        {
+            "windowStart": "2025-12-02T00:00:00Z",
+            "windowEnd": "2025-12-02T06:00:00Z",
+            "missionId": mission_id,
+        },
+    )
+    if resp2.status_code == 200 and resp.json() == resp2.json():
+        print("  [PASS] Scheduler deterministic")
+    else:
+        print("  [WARN] Scheduler output changed between runs")
 def main():
     # Bootstrap: find a valid sat_id, mission_id, gs_id
     try:
@@ -240,9 +347,12 @@ def main():
     test_excone_create_rbac(sat_id, gs_id)
     test_excone_list_basic()
     test_users_list_rbac()
+    test_scheduler_basic(sat_id, mission_id)
+
 
  # Extra: basic visibility for other subsystems
     test_satellites_basic_visibility()
     test_ground_stations_basic_visibility()
+    
 if __name__ == "__main__":
     main()

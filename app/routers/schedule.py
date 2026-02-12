@@ -13,7 +13,7 @@ from app.services.auth import get_current_user
 from app.models.user import UserModel
 
 # NOTE: if main.py already has prefix="/api/v1", use prefix="/schedule" here
-router = APIRouter(prefix="/api/v1/schedule", tags=["schedule"])
+router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 
 class ScheduleComputeRequest(BaseModel):

@@ -25,12 +25,11 @@ from datetime import datetime, timedelta
 BASE_URL = "http://localhost:8000/api/v1"   # same style as your RBAC smoke
 SCHEDULE_PATH = "/api/v1/schedule/compute"  # -> http://localhost:8000/api/v1/api/v1/schedule/compute
 
-# 🔴 FILL THESE WITH YOUR REAL TOKENS
 TOKENS = {
-    "system_admin":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzeXN0ZW1fYWRtaW4iLCJleHAiOjE3NjQ2NDk2MzJ9.uYZb-TNMT9ymPzti5X24nVHhGg90N6Ywz9mORceqq1s",
-    "system_user":   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzeXN0ZW1fdXNlciIsImV4cCI6MTc2NDY0OTY4MH0.lesCNgi0g1l8MmZd4lOfWz4tqOajAz6HssGqxF2yYC0",
-    "mission_admin": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtaXNzaW9uX2FkbWluIiwiZXhwIjoxNzY0NjQ5NzAyfQ.eulbVyHRbNKQ27qvgVxdYOUyptnJoAQvqPVL7cZiTyE",
-    "mission_user":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtaXNzaW9uX3VzZXIiLCJleHAiOjE3NjQ2NDk3MjV9.4rzGHSX352DYWMP3WMiSZthoHDSMJ2Ry9AoN7fyr3i4",
+    "system_admin":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzeXN0ZW1fYWRtaW4iLCJleHAiOjE3NzA5MzE0MDR9.VKvj99iEMJ89BlykTRGtmmm72Ya6SrxmrjYDJHSVI68",
+    "system_user":   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzeXN0ZW1fdXNlciIsImV4cCI6MTc3MDkzMTQ3M30.wwROpFko4I3eTrSNOfDTMFsymA9agikMOXS5z7BYSUk",
+    "mission_admin": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtaXNzaW9uX2FkbWluIiwiZXhwIjoxNzcwOTMxNDg2fQ.2pWFk_zj82-gEpFh1LjB71Ye_kTb4sUw-wDo3hQtX_0",
+    "mission_user":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJtaXNzaW9uX3VzZXIiLCJleHAiOjE3NzA5MzE0NTZ9.Mu8us76HAH3oW2IR_caJMFY_TBITkHw7h0lNSteWYnY",
 }
 
 MIN_GAP_SECONDS = 300  # 5-minute guard band
